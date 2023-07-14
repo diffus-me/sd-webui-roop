@@ -13,6 +13,7 @@ import insightface
 import onnxruntime
 from scripts.cimage import convert_to_sd
 
+from modules import paths_internal
 from modules.face_restoration import FaceRestoration, restore_faces
 from modules.upscaler import Upscaler, UpscalerData
 from scripts.roop_logging import logger
@@ -123,7 +124,7 @@ def swap_face(
         source_face = get_face_single(source_img, face_index=0)
         if source_face is not None:
             result = target_img
-            model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
+            model_path = os.path.join(paths_internal.models_path, model)
             face_swapper = getFaceSwapModel(model_path)
 
             for face_num in faces_index:

@@ -2,7 +2,7 @@ import os
 import gradio as gr
 import modules.scripts as scripts
 from modules.upscaler import Upscaler, UpscalerData
-from modules import scripts, shared, images, scripts_postprocessing
+from modules import scripts, shared, images, scripts_postprocessing, paths_internal
 from modules.processing import (
     StableDiffusionProcessing,
     StableDiffusionProcessingImg2Img,
@@ -19,9 +19,12 @@ import os
 
 
 def get_models():
-    models_path = os.path.join(scripts.basedir(), "models" + os.path.sep + "roop" + os.path.sep + "*")
+    models_path = os.path.join(paths_internal.models_path, "roop" + os.path.sep + "*")
     models = glob.glob(models_path)
-    models = [x for x in models if x.endswith(".onnx") or x.endswith(".pth")]
+    models_dir = (paths_internal.models_path
+                  if paths_internal.models_path.endswith("/")
+                  else paths_internal.models_path + "/")
+    models = [x.removeprefix(models_dir) for x in models if x.endswith(".onnx") or x.endswith(".pth")]
     return models
 
 
