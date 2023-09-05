@@ -11,6 +11,7 @@ from modules.shared import cmd_opts, opts, state
 from PIL import Image
 import glob
 from modules.face_restoration import FaceRestoration
+from modules.system_monitor import monitor_call_context
 
 from scripts.roop_logging import logger
 from scripts.swapper import UpscaleOptions, swap_face, ImageResult
@@ -36,10 +37,26 @@ class FaceSwapScript(scripts.Script):
         return scripts.AlwaysVisible
 
     def ui(self, is_img2img):
+        tab_id = "tab_txt2img"
+        function_name = "modules.txt2img.txt2img"
+        if is_img2img:
+            tab_id = "tab_img2img"
+            function_name = "modules.img2img.img2img"
         with gr.Accordion(f"roop {version_flag}", open=False):
             with gr.Column():
                 img = gr.inputs.Image(type="pil")
                 enable = gr.Checkbox(False, placeholder="enable", label="Enable")
+                enable.change(
+                    None,
+                    inputs=[],
+                    outputs=[enable],
+                    _js=f"""
+                        monitorMutiplier(
+                            '{tab_id}',
+                            '{function_name}',
+                            'roop.multiplier',
+                            extractor = (enable) => enable? 2 : 1)"""
+                )
                 faces_index = gr.Textbox(
                     value="0",
                     placeholder="Which face to swap (comma separated), start from 0",
@@ -165,14 +182,21 @@ class FaceSwapScript(scripts.Script):
 
                     for i in range(len(p.init_images)):
                         logger.info(f"Swap in source %s", i)
-                        result = swap_face(
-                            self.source,
-                            p.init_images[i],
-                            faces_index=self.faces_index,
-                            model=self.model,
-                            upscale_options=self.upscale_options,
-                        )
-                        p.init_images[i] = result.image()
+                        with monitor_call_context(
+                                p.get_request(),
+                                "extention.roop",
+                                "extention.roop.process",
+                                decoded_params={
+                                    "width": p.init_images[i].width,
+                                    "height": p.init_images[i].height}):
+                            result = swap_face(
+                                self.source,
+                                p.init_images[i],
+                                faces_index=self.faces_index,
+                                model=self.model,
+                                upscale_options=self.upscale_options,
+                            )
+                            p.init_images[i] = result.image()
             else:
                 logger.error(f"Please provide a source face")
 
@@ -184,13 +208,20 @@ class FaceSwapScript(scripts.Script):
         if self.enable and self.swap_in_generated:
             if self.source is not None:
                 image: Image.Image = script_pp.image
-                result: ImageResult = swap_face(
-                    self.source,
-                    image,
-                    faces_index=self.faces_index,
-                    model=self.model,
-                    upscale_options=self.upscale_options,
-                )
+                with monitor_call_context(
+                        p.get_request(),
+                        "extention.roop",
+                        "extention.roop.postprocess_image",
+                        decoded_params={
+                            "width": image.width,
+                            "height": image.height}):
+                    result: ImageResult = swap_face(
+                        self.source,
+                        image,
+                        faces_index=self.faces_index,
+                        model=self.model,
+                        upscale_options=self.upscale_options,
+                    )
                 pp = scripts_postprocessing.PostprocessedImage(result.image())
                 pp.info = {}
                 p.extra_generation_params.update(pp.info)
