@@ -3,7 +3,7 @@ import math
 import os
 import tempfile
 from dataclasses import dataclass
-from typing import List, Union, Dict, Set, Tuple
+from typing import List, Union, Dict, Set, Tuple, Optional
 
 import cv2
 import numpy as np
@@ -31,6 +31,24 @@ class UpscaleOptions:
 
 FS_MODEL = None
 CURRENT_FS_MODEL_PATH = None
+
+class FaceAnalyzer(object):
+
+    def __init__(self, name: str, providers: List[str] = ["CPUExecutionProvider"]):
+        self.model_name = name
+        self.model = None
+
+    def get(self) -> insightface.app.FaceAnalysis:
+        if self.model is None:
+            self.model = insightface.app.FaceAnalysis(name=self.model_name, providers=providers)
+        return self.model
+
+    def release(self):
+        if self.model is not None:
+            self.model = None
+
+
+face_analyzer = FaceAnalyzer("buffalo_l", providers=providers)
 
 
 def getFaceSwapModel(model_path: str):
@@ -73,14 +91,16 @@ def upscale_image(image: Image, upscale_options: UpscaleOptions):
     return result_image
 
 
-def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
-    face_analyser = insightface.app.FaceAnalysis(name="buffalo_l", providers=providers)
+def get_face_single(
+        img_data: np.ndarray, face_index=0, det_size=(640, 640), face_analyser: Optional[insightface.app.FaceAnalysis] = None):
+    if face_analyser is None:
+        face_analyser = face_analyzer.get()
     face_analyser.prepare(ctx_id=0, det_size=det_size)
     face = face_analyser.get(img_data)
 
     if len(face) == 0 and det_size[0] > 320 and det_size[1] > 320:
         det_size_half = (det_size[0] // 2, det_size[1] // 2)
-        return get_face_single(img_data, face_index=face_index, det_size=det_size_half)
+        return get_face_single(img_data, face_index=face_index, det_size=det_size_half, face_analyser=face_analyser)
 
     try:
         return sorted(face, key=lambda x: x.bbox[0])[face_index]
@@ -105,6 +125,7 @@ def swap_face(
     model: Union[str, None] = None,
     faces_index: Set[int] = {0},
     upscale_options: Union[UpscaleOptions, None] = None,
+    face_analyser: Optional[insightface.app.FaceAnalysis] = None,
 ) -> ImageResult:
     result_image = target_img
     converted = convert_to_sd(target_img)
@@ -121,14 +142,14 @@ def swap_face(
             source_img = Image.open(io.BytesIO(img_bytes))
         source_img = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
         target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
-        source_face = get_face_single(source_img, face_index=0)
+        source_face = get_face_single(source_img, face_index=0, face_analyser=face_analyser)
         if source_face is not None:
             result = target_img
             model_path = os.path.join(paths_internal.models_path, model)
             face_swapper = getFaceSwapModel(model_path)
 
             for face_num in faces_index:
-                target_face = get_face_single(target_img, face_index=face_num)
+                target_face = get_face_single(target_img, face_index=face_num, face_analyser=face_analyser)
                 if target_face is not None:
                     result = face_swapper.get(result, target_face, source_face)
                 else:
