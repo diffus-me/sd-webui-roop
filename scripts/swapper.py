@@ -29,39 +29,50 @@ class UpscaleOptions:
     face_restorer: FaceRestoration = None
     restorer_visibility: float = 0.5
 
-FS_MODEL = None
-CURRENT_FS_MODEL_PATH = None
 
 class FaceAnalyzer(object):
 
     def __init__(self, name: str, providers: List[str] = ["CPUExecutionProvider"]):
         self.model_name = name
         self.model = None
+        self.det_size = None
 
-    def get(self) -> insightface.app.FaceAnalysis:
+    def get(self, det_size=(640, 640)) -> insightface.app.FaceAnalysis:
         if self.model is None:
             self.model = insightface.app.FaceAnalysis(name=self.model_name, providers=providers)
+        if not self.det_size or self.det_size != det_size:
+            self.det_size = det_size
+            self.model.prepare(ctx_id=0, det_size=det_size)
         return self.model
 
     def release(self):
         if self.model is not None:
             self.model = None
+        if self.det_size is not None:
+            self.det_size = None
 
 
 face_analyzer = FaceAnalyzer("buffalo_l", providers=providers)
 
 
+class FaceSwapper(object):
+
+    def __init__(self):
+        self.models = {}
+
+    def get(self, model_path: str):
+        if model_path not in self.models:
+            self.models[model_path] = insightface.model_zoo.get_model(model_path, providers=providers)
+        return self.models[model_path]
+
+face_swapper = FaceSwapper()
+
+
 def getFaceSwapModel(model_path: str):
-    global FS_MODEL
-    global CURRENT_FS_MODEL_PATH
-    if CURRENT_FS_MODEL_PATH is None or CURRENT_FS_MODEL_PATH != model_path:
-        CURRENT_FS_MODEL_PATH = model_path
-        FS_MODEL = insightface.model_zoo.get_model(model_path, providers=providers)
-
-    return FS_MODEL
+    return face_swapper.get(model_path)
 
 
-def upscale_image(image: Image, upscale_options: UpscaleOptions):
+def upscale_image(image: Image.Image, upscale_options: UpscaleOptions):
     result_image = image
     if upscale_options.upscaler is not None and upscale_options.upscaler.name != "None":
         original_image = result_image.copy()
@@ -94,8 +105,7 @@ def upscale_image(image: Image, upscale_options: UpscaleOptions):
 def get_face_single(
         img_data: np.ndarray, face_index=0, det_size=(640, 640), face_analyser: Optional[insightface.app.FaceAnalysis] = None):
     if face_analyser is None:
-        face_analyser = face_analyzer.get()
-    face_analyser.prepare(ctx_id=0, det_size=det_size)
+        face_analyser = face_analyzer.get(det_size=det_size)
     face = face_analyser.get(img_data)
 
     if len(face) == 0 and det_size[0] > 320 and det_size[1] > 320:
@@ -127,7 +137,7 @@ def swap_face(
     upscale_options: Union[UpscaleOptions, None] = None,
     face_analyser: Optional[insightface.app.FaceAnalysis] = None,
 ) -> ImageResult:
-    result_image = target_img
+    result_image: Image.Image = target_img
     converted = convert_to_sd(target_img)
     scale, fn = converted[0], converted[1]
     if model is not None and not scale:
