@@ -20,7 +20,7 @@ from modules.paths import Paths
 import modules.shared as shared
 
 from scripts.roop_logging import logger
-from scripts.swapper import UpscaleOptions, swap_face, ImageResult, UpscalerData, FaceRestoration
+from scripts.swapper import UpscaleOptions, swap_face, ImageResult, UpscalerData, FaceRestoration, face_analyzer
 
 
 class ImageSource(BaseModel):
@@ -146,9 +146,11 @@ def pil_image_to_base64(image: Image.Image) -> str:
 
 
 def run_roop_on_single_image(
-        request: Request, roop_options: RoopOptions) -> RoopResponse:
+        request: Request, task_id: str, roop_options: RoopOptions) -> RoopResponse:
     start_time = datetime.now(timezone.utc)
     utc_date_str = start_time.strftime("%Y-%m-%d")
+    if task_id != roop_options.task_id:
+        raise HTTPException(status_code=400, detail="Task ID mismatch")
     task_id = roop_options.task_id
     face_image = download_image_if_needed(request, roop_options.source_image, f"face/{utc_date_str}", task_id)
     swap_image = download_image_if_needed(request, roop_options.swap_image, f"swap/{utc_date_str}", task_id)
@@ -157,7 +159,8 @@ def run_roop_on_single_image(
         Image.open(swap_image),
         model=roop_options.model,
         faces_index={roop_options.face_index},
-        upscale_options=upscale_options(roop_options)
+        upscale_options=upscale_options(roop_options),
+        face_analyser=face_analyzer.get(),
     )
     result_image = result.image()
     if result_image is None:
@@ -176,7 +179,7 @@ def run_roop_on_single_image(
 
 def setup_apis(_: gr.Blocks, app: FastAPI):
     app.add_api_route(
-        "/internal/roop/image",
+        "/api/internal/cpu/roop_image/{task_id}",
         run_roop_on_single_image,
         methods=["POST"],
         response_model=RoopResponse)

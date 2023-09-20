@@ -14,7 +14,7 @@ from modules.face_restoration import FaceRestoration
 from modules.system_monitor import monitor_call_context
 
 from scripts.roop_logging import logger
-from scripts.swapper import UpscaleOptions, swap_face, ImageResult
+from scripts.swapper import UpscaleOptions, swap_face, ImageResult, face_analyzer
 from scripts.roop_version import version_flag
 import os
 
@@ -195,6 +195,7 @@ class FaceSwapScript(scripts.Script):
                                 faces_index=self.faces_index,
                                 model=self.model,
                                 upscale_options=self.upscale_options,
+                                face_analyser=face_analyzer.get(),
                             )
                             p.init_images[i] = result.image()
             else:
@@ -221,6 +222,7 @@ class FaceSwapScript(scripts.Script):
                         faces_index=self.faces_index,
                         model=self.model,
                         upscale_options=self.upscale_options,
+                        face_analyser=face_analyzer.get(),
                     )
                 pp = scripts_postprocessing.PostprocessedImage(result.image())
                 pp.info = {}
