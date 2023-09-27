@@ -41,8 +41,8 @@ class FaceAnalyzer(object):
         if self.model is None:
             self.model = insightface.app.FaceAnalysis(name=self.model_name, providers=providers)
         if not self.det_size or self.det_size != det_size:
-            self.det_size = det_size
             self.model.prepare(ctx_id=0, det_size=det_size)
+            self.det_size = det_size
         return self.model
 
     def release(self):
