@@ -42,7 +42,7 @@ class FaceSwapScript(scripts.Script):
         if is_img2img:
             tab_id = "tab_img2img"
             function_name = "modules.img2img.img2img"
-        with gr.Accordion(f"roop {version_flag}", open=False):
+        with gr.Accordion(f"Face Swapper (roop {version_flag})", open=False):
             with gr.Column():
                 img = gr.inputs.Image(type="pil")
                 enable = gr.Checkbox(False, placeholder="enable", label="Enable")
