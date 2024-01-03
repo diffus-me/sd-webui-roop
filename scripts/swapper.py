@@ -29,6 +29,14 @@ class UpscaleOptions:
     face_restorer: FaceRestoration = None
     restorer_visibility: float = 0.5
 
+    @property
+    def enable_upscale(self) -> bool:
+        return self.upscaler is not None and self.upscaler.name != "None"
+
+    @property
+    def enable_restore_faces(self) -> bool:
+        return self.face_restorer is not None
+
 
 class FaceAnalyzer(object):
 
@@ -74,7 +82,7 @@ def getFaceSwapModel(model_path: str):
 
 def upscale_image(image: Image.Image, upscale_options: UpscaleOptions):
     result_image = image
-    if upscale_options.upscaler is not None and upscale_options.upscaler.name != "None":
+    if upscale_options.enable_upscale:
         original_image = result_image.copy()
         logger.info(
             "Upscale with %s scale = %s",
@@ -89,7 +97,7 @@ def upscale_image(image: Image.Image, upscale_options: UpscaleOptions):
                 original_image, result_image, upscale_options.upscale_visibility
             )
 
-    if upscale_options.face_restorer is not None:
+    if upscale_options.enable_restore_faces:
         original_image = result_image.copy()
         logger.info("Restore face with %s", upscale_options.face_restorer.name())
         numpy_image = np.array(result_image)
