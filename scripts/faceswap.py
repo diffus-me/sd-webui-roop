@@ -46,17 +46,6 @@ class FaceSwapScript(scripts.Script):
             with gr.Column():
                 img = gr.inputs.Image(type="pil")
                 enable = gr.Checkbox(False, placeholder="enable", label="Enable")
-                enable.change(
-                    None,
-                    inputs=[],
-                    outputs=[enable],
-                    _js=f"""
-                        monitorMutiplier(
-                            '{tab_id}',
-                            '{function_name}',
-                            'roop.multiplier',
-                            extractor = (enable) => enable? 2 : 1)"""
-                )
                 faces_index = gr.Textbox(
                     value="0",
                     placeholder="Which face to swap (comma separated), start from 0",
@@ -106,6 +95,50 @@ class FaceSwapScript(scripts.Script):
                     placeholder="Swap face in generated image",
                     label="Swap in generated image",
                     visible=is_img2img,
+                )
+
+                _kwargs = {
+                    "fn": None,
+                    "inputs": [enable, swap_in_source, swap_in_generated],
+                    "outputs": [enable],
+                    "_js": f"""monitorThisParam(
+                        '{tab_id}',
+                        '{function_name}',
+                        'roop_n_iter',
+                        extractor = ([enable, swap_in_source, swap_in_generated]) => enable ? swap_in_source + swap_in_generated : 0)
+                    """,
+                }
+
+                enable.change(**_kwargs)
+                swap_in_source.change(**_kwargs)
+                swap_in_generated.change(**_kwargs)
+                upscaler_name.change(
+                    None,
+                    inputs=[],
+                    outputs=[upscaler_name],
+                    _js=f"""monitorThisParam(
+                        '{tab_id}',
+                        '{function_name}',
+                        'roop_enable_upscale',
+                        extractor = (upscaler_name) => upscaler_name && upscaler_name !== 'None')
+                    """,
+                )
+                upscaler_scale.change(
+                    None,
+                    inputs=[],
+                    outputs=[upscaler_scale],
+                    _js=f"monitorThisParam('{tab_id}', '{function_name}', 'roop_scale')",
+                )
+                face_restorer_name.change(
+                    None,
+                    inputs=[],
+                    outputs=[face_restorer_name],
+                    _js=f"""monitorThisParam(
+                        '{tab_id}',
+                        '{function_name}',
+                        'roop_disable_restore_faces',
+                        extractor = (face_restorer_name) => face_restorer_name === 'None')
+                    """,
                 )
 
         return [
@@ -180,21 +213,27 @@ class FaceSwapScript(scripts.Script):
                 if isinstance(p, StableDiffusionProcessingImg2Img) and swap_in_source:
                     logger.info(f"roop enabled, face index %s", self.faces_index)
 
+                    upscale_options = self.upscale_options
                     for i in range(len(p.init_images)):
                         logger.info(f"Swap in source %s", i)
                         with monitor_call_context(
-                                p.get_request(),
-                                "extention.roop",
-                                "extention.roop.process",
-                                decoded_params={
-                                    "width": p.init_images[i].width,
-                                    "height": p.init_images[i].height}):
+                            p.get_request(),
+                            "extention.roop",
+                            "extention.roop.process",
+                            decoded_params={
+                                "width": p.init_images[i].width,
+                                "height": p.init_images[i].height,
+                                "enable_upscale": upscale_options.enable_upscale,
+                                "scale": upscale_options.scale,
+                                "disable_restore_faces": not upscale_options.enable_restore_faces,
+                            }
+                        ):
                             result = swap_face(
                                 self.source,
                                 p.init_images[i],
                                 faces_index=self.faces_index,
                                 model=self.model,
-                                upscale_options=self.upscale_options,
+                                upscale_options=upscale_options,
                                 face_analyser=face_analyzer.get(),
                             )
                             p.init_images[i] = result.image()
@@ -209,19 +248,25 @@ class FaceSwapScript(scripts.Script):
         if self.enable and self.swap_in_generated:
             if self.source is not None:
                 image: Image.Image = script_pp.image
+                upscale_options = self.upscale_options
                 with monitor_call_context(
-                        p.get_request(),
-                        "extention.roop",
-                        "extention.roop.postprocess_image",
-                        decoded_params={
-                            "width": image.width,
-                            "height": image.height}):
+                    p.get_request(),
+                    "extention.roop",
+                    "extention.roop.postprocess_image",
+                    decoded_params={
+                        "width": image.width,
+                        "height": image.height,
+                        "enable_upscale": upscale_options.enable_upscale,
+                        "scale": upscale_options.scale,
+                        "enable_restore_faces": upscale_options.enable_restore_faces,
+                    }
+                ):
                     result: ImageResult = swap_face(
                         self.source,
                         image,
                         faces_index=self.faces_index,
                         model=self.model,
-                        upscale_options=self.upscale_options,
+                        upscale_options=upscale_options,
                         face_analyser=face_analyzer.get(),
                     )
                 pp = scripts_postprocessing.PostprocessedImage(result.image())
