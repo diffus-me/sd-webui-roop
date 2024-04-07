@@ -226,7 +226,8 @@ class FaceSwapScript(scripts.Script):
                                 "enable_upscale": upscale_options.enable_upscale,
                                 "scale": upscale_options.scale,
                                 "disable_restore_faces": not upscale_options.enable_restore_faces,
-                            }
+                            },
+                            only_available_for=["basic", "plus", "pro", "api"],
                         ):
                             result = swap_face(
                                 self.source,
@@ -259,7 +260,8 @@ class FaceSwapScript(scripts.Script):
                         "enable_upscale": upscale_options.enable_upscale,
                         "scale": upscale_options.scale,
                         "enable_restore_faces": upscale_options.enable_restore_faces,
-                    }
+                    },
+                    only_available_for=["basic", "plus", "pro", "api"],
                 ):
                     result: ImageResult = swap_face(
                         self.source,
