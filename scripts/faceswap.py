@@ -45,7 +45,7 @@ class FaceSwapScript(scripts.Script):
         with gr.Accordion(f"Face Swapper (roop {version_flag})", open=False):
             with gr.Column():
                 img = gr.inputs.Image(type="pil")
-                enable = gr.Checkbox(False, placeholder="enable", label="Enable")
+                enable = gr.Checkbox(False, placeholder="enable", label="Enable", elem_id=f"{tab_id}_roop_enable")
                 faces_index = gr.Textbox(
                     value="0",
                     placeholder="Which face to swap (comma separated), start from 0",
