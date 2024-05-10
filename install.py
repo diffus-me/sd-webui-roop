@@ -33,10 +33,12 @@ with open(req_file) as file:
             python = sys.executable
             package = package.strip()
 
+            params = " --no-deps" if "ifnude" in package else ""
+
             if not launch.is_installed(package):
                 print(f"Install {package}")
                 launch.run_pip(
-                    f"install {package}", f"sd-webui-roop requirement: {package}"
+                    f"install {package}{params}", f"sd-webui-roop requirement: {package}"
                 )
             elif "==" in package:
                 package_name, package_version = package.split("==")
@@ -46,7 +48,7 @@ with open(req_file) as file:
                         f"Install {package}, {installed_version} vs {package_version}"
                     )
                     launch.run_pip(
-                        f"install {package}",
+                        f"install {package}{params}",
                         f"sd-webui-roop requirement: changing {package_name} version from {installed_version} to {package_version}",
                     )
 
